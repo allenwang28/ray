@@ -16,6 +16,7 @@ from ray.autoscaler._private.gcp.config import (
 # The logic has been abstracted away here to allow for different GCP resources
 # (API endpoints), which can differ widely, making it impossible to use
 # the same logic for everything.
+from ray.autoscaler.command_runner import CommandRunnerInterface
 from ray.autoscaler._private.gcp.node import GCPTPU  # noqa
 from ray.autoscaler._private.gcp.node import (
     GCPCompute,
@@ -23,6 +24,8 @@ from ray.autoscaler._private.gcp.node import (
     GCPNodeType,
     GCPResource,
 )
+from ray.autoscaler._private.gcp.tpu_pod_command_runner import TPUPodCommandRunner
+from ray.autoscaler._private.command_runner import DockerCommandRunner, SSHCommandRunner
 from ray.autoscaler.node_provider import NodeProvider
 
 logger = logging.getLogger(__name__)
@@ -235,3 +238,29 @@ class GCPNodeProvider(NodeProvider):
     @staticmethod
     def bootstrap_config(cluster_config):
         return bootstrap_gcp(cluster_config)
+
+    def get_command_runner(
+        self, node_id: str, *args, **kwargs) -> CommandRunnerInterface:
+        """Returns the CommandRunner class used to perform SSH commands.
+
+        Args:
+        log_prefix: stores "NodeUpdater: {}: ".format(<node_id>). Used
+            to print progress in the CommandRunner.
+        node_id: the node ID.
+        auth_config: the authentication configs from the autoscaler
+            yaml file.
+        cluster_name: the name of the cluster.
+        process_runner: the module to use to run the commands
+            in the CommandRunner. E.g., subprocess.
+        use_internal_ip: whether the node_id belongs to an internal ip
+            or external ip.
+        docker_config: If set, the docker information of the docker
+            container that commands should be run on.
+        """
+        resource = self._get_resource_depending_on_node_name(node_id)
+        kwargs["node_id"] = node_id
+        instance = resource.get_instance(node_id)
+        if resource == self.resources[GCPNodeType.TPU]:
+            return TPUPodCommandRunner(instance=instance, *args, **kwargs)
+        else:
+            return super().get_command_runner(*args, **kwargs)

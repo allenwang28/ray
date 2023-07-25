@@ -167,6 +167,7 @@ class SSHCommandRunner(CommandRunnerInterface):
         process_runner,
         use_internal_ip,
     ):
+        print("Initializing SSHCommandRunner")
 
         ssh_control_hash = hashlib.md5(cluster_name.encode()).hexdigest()
         ssh_user_hash = hashlib.md5(getuser().encode()).hexdigest()
@@ -315,6 +316,7 @@ class SSHCommandRunner(CommandRunnerInterface):
         shutdown_after_run=False,
         silent=False,
     ):
+        print("DEBUG: SSHCommandRunner running")
         if shutdown_after_run:
             cmd += "; sudo shutdown -h now"
 

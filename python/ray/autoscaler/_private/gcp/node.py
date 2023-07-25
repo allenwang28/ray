@@ -196,15 +196,25 @@ class GCPTPUNode(GCPNode):
     def get_labels(self) -> dict:
         return self.get("labels", {})
 
-    def get_external_ip(self) -> str:
-        return (
-            self.get("networkEndpoints", [{}])[0]
+    def get_num_workers(self) -> int:
+        return len(self.get("networkEndpoints", [{}]))
+
+    def get_external_ips(self) -> List[str]:
+        return self.get("networkEndpoints", [{}])
+
+    def get_external_ip(self, worker_index: int = 0) -> str:
+        return (self.get_external_ips()[worker_index]
             .get("accessConfig", {})
             .get("externalIp", None)
         )
 
-    def get_internal_ip(self) -> str:
-        return self.get("networkEndpoints", [{}])[0].get("ipAddress", None)
+    def get_internal_ips(self) -> List[str]:
+        return self.get("networkEndpoints", [{}])
+
+    def get_internal_ip(self, worker_index: int = 0) -> str:
+        return (self.get_internal_ips()[worker_index]
+            .get("ipAddress", None)
+        )
 
 
 class GCPResource(metaclass=abc.ABCMeta):
@@ -366,10 +376,14 @@ class GCPCompute(GCPResource):
             )
             + ")"
         )
-
         cluster_name_filter_expr = "(labels.{key} = {value})".format(
             key=TAG_RAY_CLUSTER_NAME, value=self.cluster_name
         )
+
+        # TPU VMs spawn accompanying Compute Instances that must be filtered out,
+        # else this results in duplicated nodes.
+        tpu_negation_filter_expr = "(NOT labels.{label}:*)".format(
+            label="tpu_cores")
 
         not_empty_filters = [
             f
@@ -377,11 +391,13 @@ class GCPCompute(GCPResource):
                 label_filter_expr,
                 instance_state_filter_expr,
                 cluster_name_filter_expr,
+                tpu_negation_filter_expr,
             ]
             if f
         ]
 
         filter_expr = " AND ".join(not_empty_filters)
+        print(filter_expr)
 
         response = (
             self.resource.instances()
