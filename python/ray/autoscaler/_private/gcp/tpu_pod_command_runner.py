@@ -10,7 +10,7 @@ from ray.autoscaler._private.command_runner import DockerCommandRunner, SSHComma
 from ray.autoscaler._private.gcp.node import GCPTPUNode
 
 
-_MAX_NUM_CONCURRENT_ACTIVE_CONNECTIONS = 32
+_MAX_NUM_CONCURRENT_ACTIVE_CONNECTIONS = 64
 
 
 class TPUVMSSHCommandRunner(SSHCommandRunner):

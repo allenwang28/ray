@@ -37,8 +37,9 @@ provider:
     project_id: mlperf-high-priority-project
 
 initialization_commands:
-  - sudo apt-get update
-  - sudo apt-get install -y python3-pip python-is-python3
+  - sleep $[ ( $RANDOM % 30 ) + 1 ]s && sudo apt-get update
+  - sleep $[ ( $RANDOM % 30 ) + 1 ]s && sudo apt-get install -y python3-pip
+  - sleep $[ ( $RANDOM % 30 ) + 1 ]s && sudo apt-get install -y python-is-python3
 
 setup_commands:
   - pip install "pydantic<2"
