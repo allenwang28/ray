@@ -397,7 +397,6 @@ class GCPCompute(GCPResource):
         ]
 
         filter_expr = " AND ".join(not_empty_filters)
-        print(filter_expr)
 
         response = (
             self.resource.instances()
@@ -497,7 +496,6 @@ class GCPCompute(GCPResource):
         # removing TPU-specific default key set in config.py
         config.pop("networkConfig", None)
         name = _generate_node_name(labels, GCPNodeType.COMPUTE.value)
-        print("DEBUG: Compute name: ", name)
 
         labels = dict(config.get("labels", {}), **labels)
 

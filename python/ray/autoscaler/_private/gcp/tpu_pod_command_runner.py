@@ -10,6 +10,9 @@ from ray.autoscaler._private.command_runner import DockerCommandRunner, SSHComma
 from ray.autoscaler._private.gcp.node import GCPTPUNode
 
 
+_MAX_NUM_CONCURRENT_ACTIVE_CONNECTIONS = 32
+
+
 class TPUVMSSHCommandRunner(SSHCommandRunner):
     """An SSH command runner for TPU VMs that overwrites IP addresses."""
 
@@ -46,11 +49,11 @@ class TPUPodCommandRunner:
         process_runner: ModuleType,
         use_internal_ip: bool,
         docker_config: Optional[Dict[str, Any]] = None):
-        def create_command_runner(internal_ip, external_ip):
+        def create_command_runner(worker_id, internal_ip, external_ip):
             common_args = {
                 "internal_ip": internal_ip,
                 "external_ip": external_ip,
-                "log_prefix": log_prefix,
+                "log_prefix": "[worker_{}]".format(worker_id) + log_prefix,
                 "node_id": node_id,
                 "provider": self,
                 "auth_config": auth_config,
@@ -68,12 +71,13 @@ class TPUPodCommandRunner:
         for i in range(self._num_workers):
             self._command_runners.append(
                 create_command_runner(
+                    worker_id=i,
                     internal_ip=instance.get_internal_ip(i),
                     external_ip=instance.get_external_ip(i)))
 
     def run(self, *args, **kwargs) -> str:
         with ThreadPoolExecutor(
-            max_workers=self._num_workers) as executor:
+            _MAX_NUM_CONCURRENT_ACTIVE_CONNECTIONS) as executor:
             results = executor.map(
                 lambda i: self._command_runners[i].run(*args, **kwargs),
                 range(self._num_workers))
@@ -83,7 +87,7 @@ class TPUPodCommandRunner:
 
     def run_rsync_up(self, *args, **kwargs) -> None:
         with ThreadPoolExecutor(
-            max_workers=self._num_workers) as executor:
+            _MAX_NUM_CONCURRENT_ACTIVE_CONNECTIONS) as executor:
             executor.map(
                 lambda i: self._command_runners[i].run_rsync_up(*args, **kwargs),
                 range(self._num_workers))
@@ -96,7 +100,7 @@ class TPUPodCommandRunner:
             target: The (local) destination path.
         """
         with ThreadPoolExecutor(
-            max_workers=self._num_workers) as executor:
+            _MAX_NUM_CONCURRENT_ACTIVE_CONNECTIONS) as executor:
             executor.map(
                 lambda i: self._command_runners[i].run_rsync_down(*args, **kwargs),
                 range(self._num_workers))
@@ -118,7 +122,7 @@ class TPUPodCommandRunner:
             optional: Whether initialization is necessary.
         """
         with ThreadPoolExecutor(
-            max_workers=self._num_workers) as executor:
+            _MAX_NUM_CONCURRENT_ACTIVE_CONNECTIONS) as executor:
             results = executor.map(
                 lambda i: self._command_runners[i].run_init(*args, **kwargs),
                 range(self._num_workers))

@@ -27,7 +27,7 @@ available_node_types:
         max_workers: 1
         resources: {"TPU": 1}  # use TPU custom resource in your code
         node_config:
-            acceleratorType: v4-512
+            acceleratorType: v4-1024
             runtimeVersion: tpu-vm-v4-base
 
 provider:
@@ -44,11 +44,13 @@ setup_commands:
   - pip install "pydantic<2"
   - pip install fastapi
   - pip install 'ray[default]'==2.5.1
-  - rm -rf ~/.local/lib/python3.8/site-packages/ray/autoscaler/_private/gcp
-  - cp -R ~/gcp ~/.local/lib/python3.8/site-packages/ray/autoscaler/_private/
 
 head_setup_commands:
   - pip install google-api-python-client
+  - rm -rf ~/.local/lib/python3.8/site-packages/ray/autoscaler/_private/gcp
+  - cp -R ~/gcp ~/.local/lib/python3.8/site-packages/ray/autoscaler/_private/
+  - sudo sed -i 's/#MaxSessions 10/MaxSessions 2000/' /etc/ssh/sshd_config
+  - sudo systemctl restart sshd
 
 file_mounts: {
     "/home/ubuntu/gcp": "/home/allencwang/ray/python/ray/autoscaler/_private/gcp"
