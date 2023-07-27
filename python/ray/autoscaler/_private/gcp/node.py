@@ -497,6 +497,7 @@ class GCPCompute(GCPResource):
         # removing TPU-specific default key set in config.py
         config.pop("networkConfig", None)
         name = _generate_node_name(labels, GCPNodeType.COMPUTE.value)
+        print("DEBUG: Compute name: ", name)
 
         labels = dict(config.get("labels", {}), **labels)
 

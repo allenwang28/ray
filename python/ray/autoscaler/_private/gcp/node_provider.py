@@ -3,7 +3,8 @@ import logging
 import time
 from functools import wraps
 from threading import RLock
-from typing import Dict, List, Tuple
+from types import ModuleType
+from typing import Any, Dict, List, Optional, Tuple
 
 import googleapiclient
 
@@ -240,27 +241,28 @@ class GCPNodeProvider(NodeProvider):
         return bootstrap_gcp(cluster_config)
 
     def get_command_runner(
-        self, node_id: str, *args, **kwargs) -> CommandRunnerInterface:
-        """Returns the CommandRunner class used to perform SSH commands.
-
-        Args:
-        log_prefix: stores "NodeUpdater: {}: ".format(<node_id>). Used
-            to print progress in the CommandRunner.
-        node_id: the node ID.
-        auth_config: the authentication configs from the autoscaler
-            yaml file.
-        cluster_name: the name of the cluster.
-        process_runner: the module to use to run the commands
-            in the CommandRunner. E.g., subprocess.
-        use_internal_ip: whether the node_id belongs to an internal ip
-            or external ip.
-        docker_config: If set, the docker information of the docker
-            container that commands should be run on.
-        """
+        self,
+        log_prefix: str,
+        node_id: str,
+        auth_config: Dict[str, Any],
+        cluster_name: str,
+        process_runner: ModuleType,
+        use_internal_ip: bool,
+        docker_config: Optional[Dict[str, Any]] = None,
+    ) -> CommandRunnerInterface:
+        print("DEBUG: ", node_id)
         resource = self._get_resource_depending_on_node_name(node_id)
-        kwargs["node_id"] = node_id
         instance = resource.get_instance(node_id)
+        common_args = {
+            "docker_config": docker_config,
+            "log_prefix": log_prefix,
+            "node_id": node_id,
+            "auth_config": auth_config,
+            "cluster_name": cluster_name,
+            "process_runner": process_runner,
+            "use_internal_ip": use_internal_ip,
+        }
         if resource == self.resources[GCPNodeType.TPU]:
-            return TPUPodCommandRunner(instance=instance, *args, **kwargs)
+            return TPUPodCommandRunner(instance=instance, **common_args)
         else:
-            return super().get_command_runner(*args, **kwargs)
+            return super().get_command_runner(**common_args)
