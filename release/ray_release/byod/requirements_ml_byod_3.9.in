@@ -1,0 +1,23 @@
+# Python requirements to run release tests from anyscale byod (gpu type, python 3.9)
+accelerate
+datasets
+deepspeed
+diffusers
+evaluate
+fastapi
+ipywidgets
+matplotlib
+numpy
+statsforecast
+transformers
+torch
+torchtext
+torchvision
+bitsandbytes
+wandb
+pytorch-lightning
+protobuf<3.21.0
+torchmetrics
+lm_eval
+tiktoken
+sentencepiece

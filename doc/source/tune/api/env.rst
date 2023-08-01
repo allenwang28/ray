@@ -21,7 +21,7 @@ These are the environment variables Ray Tune currently considers:
 * **TUNE_DISABLE_DATED_SUBDIR**: Ray Tune automatically adds a date string to experiment
   directories when the name is not specified explicitly or the trainable isn't passed
   as a string. Setting this environment variable to ``1`` disables adding these date strings.
-* **TUNE_NEW_EXECUTION**: Disable :ref:`Ray Tune's new execution engine <air-experimental-execution>`.
+* **TUNE_NEW_EXECUTION**: Disable `Ray Tune's new execution engine <https://github.com/ray-project/ray/issues/36949>`_.
 * **TUNE_DISABLE_STRICT_METRIC_CHECKING**: When you report metrics to Tune via
   ``session.report()`` and passed a ``metric`` parameter to ``Tuner()``, a scheduler,
   or a search algorithm, Tune will error
@@ -98,9 +98,18 @@ These are the environment variables Ray Tune currently considers:
   Default is ``0``. While this retry counter is taking effect, per trial failure number will not be incremented, which
   is compared against ``max_failures``.
 * **TUNE_CHECKPOINT_CLOUD_RETRY_NUM**: The number of retries that are done if a cloud checkpoint operation (uploading, downloading, removing)
-  fails. Default is ``3``.
+  fails. Default is ``2``.
 * **TUNE_CHECKPOINT_CLOUD_RETRY_WAIT_TIME_S**: The amount of time in seconds spent on waiting between cloud checkpoint operation retries. Default is
   ``1``.
+* **RAY_AIR_FULL_TRACEBACKS**: If set to 1, will print full tracebacks for training functions,
+  including internal code paths. Otherwise, abbreviated tracebacks that only show user code
+  are printed. Defaults to 0 (disabled).
+* **RAY_AIR_NEW_OUTPUT**: If set to 0, this disables
+  the `experimental new console output <https://github.com/ray-project/ray/issues/36949>`_.
+* **RAY_AIR_RICH_LAYOUT**: If set to 1, this enables
+  the `stick table layout <https://github.com/ray-project/ray/issues/36949>`_.
+
+
 
 There are some environment variables that are mostly relevant for integrated libraries:
 

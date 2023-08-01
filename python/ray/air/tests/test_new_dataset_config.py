@@ -7,7 +7,7 @@ import ray
 from ray.air import session
 from ray.air.config import ScalingConfig
 from ray.data import DataIterator
-from ray.train.data_config import DataConfig
+from ray.train import DataConfig
 from ray.train.data_parallel_trainer import DataParallelTrainer
 
 
@@ -32,7 +32,8 @@ class TestBasic(DataParallelTrainer):
                 else:
                     count = 0
                     for batch in shard.iter_batches():
-                        count += len(batch)
+                        for arr in batch.values():
+                            count += arr.size
                     assert count == v, shard
 
         kwargs.pop("scaling_config", None)
@@ -78,6 +79,10 @@ def test_basic(ray_start_4_cpus):
     test.fit()
 
 
+@pytest.mark.skip(
+    reason="Incomplete implementation of _validate_dag causes other errors, so we "
+    "remove DAG validation for now; see https://github.com/ray-project/ray/pull/37829"
+)
 def test_configure_execution_options(ray_start_4_cpus):
     ds = ray.data.range(10)
     # Resource limit is too low and will trigger an error.

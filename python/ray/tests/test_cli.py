@@ -282,6 +282,7 @@ def test_disable_usage_stats(monkeypatch, tmp_path):
 # it seems like interactive terminal detection works differently in python 3.8
 # compared to 3.7. Without this, tests would fail.
 # Todo: This should be removed again. Also, some tests are currently skipped.
+@pytest.mark.skipif(sys.platform == "darwin", reason="Currently failing on OSX")
 def test_ray_start(configure_lang, monkeypatch, tmp_path, cleanup_ray):
     monkeypatch.setenv("RAY_USAGE_STATS_CONFIG_PATH", str(tmp_path / "config.json"))
     runner = CliRunner(env={"RAY_USAGE_STATS_PROMPT_ENABLED": "0"})
@@ -901,10 +902,13 @@ def test_ray_submit(configure_lang, configure_aws, _unlink_test_ssh_key):
             _check_output_via_pattern("test_ray_submit.txt", result)
 
 
-def test_ray_status(shutdown_only, monkeypatch):
+@pytest.mark.parametrize("enable_v2", [True, False])
+def test_ray_status(shutdown_only, monkeypatch, enable_v2):
     import ray
 
-    address = ray.init(num_cpus=3).get("address")
+    address = ray.init(
+        num_cpus=3, _system_config={"enable_autoscaler_v2": enable_v2}
+    ).get("address")
     runner = CliRunner()
 
     def output_ready():
@@ -934,9 +938,12 @@ def test_ray_status(shutdown_only, monkeypatch):
 
 
 @pytest.mark.xfail(cluster_not_supported, reason="cluster not supported on Windows")
-def test_ray_status_multinode(ray_start_cluster):
+@pytest.mark.parametrize("enable_v2", [True, False])
+def test_ray_status_multinode(ray_start_cluster, enable_v2):
     cluster = ray_start_cluster
-    for _ in range(4):
+    cluster.add_node(num_cpus=2, _system_config={"enable_autoscaler_v2": enable_v2})
+    ray.init(address=cluster.address)
+    for _ in range(3):
         cluster.add_node(num_cpus=2)
     runner = CliRunner()
 

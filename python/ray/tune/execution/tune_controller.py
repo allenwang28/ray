@@ -14,6 +14,7 @@ from ray.air.config import CheckpointConfig
 from ray.air._internal.checkpoint_manager import CheckpointStorage, _TrackedCheckpoint
 from ray.air.execution import ResourceManager, PlacementGroupResourceManager
 from ray.air.execution._internal import RayActorManager, TrackedActor
+from ray.train._internal.storage import StorageContext
 from ray.exceptions import RayActorError
 from ray.tune.error import _AbortTrialExecution
 from ray.tune.execution.ray_trial_executor import _class_cache
@@ -64,6 +65,7 @@ class TuneController(_TuneControllerBase):
         callbacks: Optional[List[Callback]] = None,
         metric: Optional[str] = None,
         trial_checkpoint_config: Optional[CheckpointConfig] = None,
+        storage: Optional[StorageContext] = None,
         chdir_to_trial_dir: bool = False,
         reuse_actors: bool = False,
         resource_manager_factory: Optional[Callable[[], ResourceManager]] = None,
@@ -129,7 +131,7 @@ class TuneController(_TuneControllerBase):
         self._actor_force_cleanup_timeout: int = 10
 
         # Reuse actors
-        self._reuse_actors = reuse_actors  # reuse_actors
+        self._reuse_actors = reuse_actors
         self._actor_cache = _ObjectCache(may_keep_one=True)
 
         # General trial behavior
@@ -161,6 +163,7 @@ class TuneController(_TuneControllerBase):
             callbacks=callbacks,
             metric=metric,
             trial_checkpoint_config=trial_checkpoint_config,
+            storage=storage,
             _trainer_api=_trainer_api,
         )
 
@@ -549,6 +552,12 @@ class TuneController(_TuneControllerBase):
                 )
                 if not self._maybe_reuse_cached_actor(start_trial):
                     self._resources_to_pending_trials[resource].add(start_trial)
+                else:
+                    if start_trial not in self._staged_trials:
+                        self._staged_trials.add(start_trial)
+                        self._actor_cache.increase_max(
+                            start_trial.placement_group_factory
+                        )
 
     def _maybe_reuse_cached_actor(self, trial: Trial) -> bool:
         """Maybe reuse a cached actor for a trial.

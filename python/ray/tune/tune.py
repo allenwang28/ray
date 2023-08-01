@@ -28,6 +28,7 @@ from ray.air import CheckpointConfig
 from ray.air._internal import usage as air_usage
 from ray.air._internal.usage import AirEntrypoint
 from ray.air.util.node import _force_on_current_node
+from ray.train._internal.storage import _use_storage_context
 from ray.tune.analysis import ExperimentAnalysis
 from ray.tune.callback import Callback
 from ray.tune.error import TuneError
@@ -35,7 +36,6 @@ from ray.tune.execution.tune_controller import TuneController
 from ray.tune.experiment import Experiment, _convert_to_experiment_list
 from ray.tune.experimental.output import (
     get_air_verbosity,
-    _detect_reporter as _detect_air_reporter,
     IS_NOTEBOOK,
     AirVerbosity,
 )
@@ -93,6 +93,8 @@ from ray.util.annotations import PublicAPI
 from ray.util.queue import Queue
 
 if TYPE_CHECKING:
+    import pyarrow.fs
+
     from ray.tune.experimental.output import ProgressReporter as AirProgressReporter
 
 logger = logging.getLogger(__name__)
@@ -257,7 +259,7 @@ def _resolve_and_validate_storage_path(
         assert local_path == local_dir
         warnings.warn(
             "Passing a `local_dir` is deprecated and will be removed "
-            "in the future. Pass `storage_path` instead or set the"
+            "in the future. Pass `storage_path` instead or set the "
             "`RAY_AIR_LOCAL_CACHE_DIR` environment variable instead."
         )
         local_path = local_dir
@@ -304,6 +306,7 @@ def run(
     ] = None,
     num_samples: int = 1,
     storage_path: Optional[str] = None,
+    storage_filesystem: Optional["pyarrow.fs.FileSystem"] = None,
     search_alg: Optional[Union[Searcher, SearchAlgorithm, str]] = None,
     scheduler: Optional[Union[TrialScheduler, str]] = None,
     checkpoint_config: Optional[CheckpointConfig] = None,
@@ -595,7 +598,7 @@ def run(
                 "[output] This uses the legacy output and progress reporter, "
                 "as Ray client is not supported by the new engine. "
                 "For more information, see "
-                "https://docs.ray.io/en/master/ray-air/experimental-features.html"
+                "https://github.com/ray-project/ray/issues/36949"
             )
 
         remote_run = ray.remote(num_cpus=0)(run)
@@ -658,7 +661,7 @@ def run(
             "[output] This uses the legacy output and progress reporter, "
             "as Jupyter notebooks are not supported by the new engine, yet. "
             "For more information, please see "
-            "https://docs.ray.io/en/master/ray-air/experimental-features.html"
+            "https://github.com/ray-project/ray/issues/36949"
         )
         air_verbosity = None
 
@@ -668,7 +671,7 @@ def run(
             f"{air_verbosity}. To disable the new output and use the legacy "
             f"output engine, set the environment variable RAY_AIR_NEW_OUTPUT=0. "
             f"For more information, please see "
-            f"https://docs.ray.io/en/master/ray-air/experimental-features.html"
+            f"https://github.com/ray-project/ray/issues/36949"
         )
         # Disable old output engine
         set_verbosity(0)
@@ -686,18 +689,22 @@ def run(
             f"Got '{type(config)}' instead."
         )
 
-    (
-        storage_path,
-        local_path,
-        remote_path,
-        sync_config,
-    ) = _resolve_and_validate_storage_path(
-        storage_path=storage_path, local_dir=local_dir, sync_config=sync_config
-    )
+    if _use_storage_context():
+        local_path, remote_path = None, None
+        # TODO(justinvyu): Fix telemetry for the new persistence.
+    else:
+        (
+            storage_path,
+            local_path,
+            remote_path,
+            sync_config,
+        ) = _resolve_and_validate_storage_path(
+            storage_path=storage_path, local_dir=local_dir, sync_config=sync_config
+        )
 
-    air_usage.tag_ray_air_storage_config(
-        local_path=local_path, remote_path=remote_path, sync_config=sync_config
-    )
+        air_usage.tag_ray_air_storage_config(
+            local_path=local_path, remote_path=remote_path, sync_config=sync_config
+        )
 
     checkpoint_config = checkpoint_config or CheckpointConfig()
 
@@ -847,6 +854,8 @@ def run(
         placeholder_resolvers,
     )
 
+    # TODO(justinvyu): We should remove the ability to pass a list of
+    # trainables to tune.run.
     if isinstance(run_or_experiment, list):
         experiments = run_or_experiment
     else:
@@ -863,6 +872,7 @@ def run(
                 resources_per_trial=resources_per_trial,
                 num_samples=num_samples,
                 storage_path=storage_path,
+                storage_filesystem=storage_filesystem,
                 _experiment_checkpoint_dir=_experiment_checkpoint_dir,
                 sync_config=sync_config,
                 checkpoint_config=checkpoint_config,
@@ -966,7 +976,10 @@ def run(
         callbacks,
         sync_config=sync_config,
         air_verbosity=air_verbosity,
+        entrypoint=_entrypoint,
+        config=config,
         metric=metric,
+        mode=mode,
         progress_metrics=progress_metrics,
     )
 
@@ -1030,8 +1043,13 @@ def run(
         runner_kwargs.pop("trial_executor")
         runner_kwargs["reuse_actors"] = reuse_actors
         runner_kwargs["chdir_to_trial_dir"] = chdir_to_trial_dir
+        runner_kwargs["storage"] = experiments[0].storage
     else:
         trial_runner_cls = TrialRunner
+        if _use_storage_context():
+            raise ValueError(
+                "The old execution path does not support the new persistence mode."
+            )
 
     runner = trial_runner_cls(**runner_kwargs)
 
@@ -1066,14 +1084,15 @@ def run(
             mode=mode,
         )
     else:
-        air_progress_reporter = _detect_air_reporter(
-            air_verbosity,
-            num_samples=search_alg.total_samples,
-            entrypoint=_entrypoint,
-            metric=metric,
-            mode=mode,
-            config=config,
-        )
+        from ray.tune.experimental.output import ProgressReporter as AirProgressReporter
+
+        for callback in callbacks:
+            if isinstance(callback, AirProgressReporter):
+                air_progress_reporter = callback
+                air_progress_reporter.setup(
+                    start_time=tune_start, total_samples=search_alg.total_samples
+                )
+                break
 
     # rich live context manager has to be called encapsulating
     # the while loop. For other kind of reporters, no op.
@@ -1081,8 +1100,15 @@ def run(
     with contextlib.ExitStack() as stack:
         from ray.tune.experimental.output import TuneRichReporter
 
+        if _use_storage_context():
+            experiment_local_path = runner._storage.experiment_local_path
+            experiment_dir_name = runner._storage.experiment_dir_name
+        else:
+            experiment_local_path = runner._legacy_local_experiment_path
+            experiment_dir_name = runner._legacy_experiment_dir_name
+
         if any(isinstance(cb, TBXLoggerCallback) for cb in callbacks):
-            tensorboard_path = runner._local_experiment_path
+            tensorboard_path = experiment_local_path
         else:
             tensorboard_path = None
 
@@ -1092,7 +1118,7 @@ def run(
             stack.enter_context(air_progress_reporter.with_live())
         elif air_progress_reporter:
             air_progress_reporter.experiment_started(
-                experiment_name=runner._experiment_dir_name,
+                experiment_name=experiment_dir_name,
                 experiment_path=runner.experiment_path,
                 searcher_str=search_alg.__class__.__name__,
                 scheduler_str=scheduler.__class__.__name__,
@@ -1128,7 +1154,6 @@ def run(
             _report_air_progress(runner, air_progress_reporter, force=True)
 
     all_trials = runner.get_trials()
-    experiment_checkpoint = runner.experiment_state_path
 
     runner.cleanup()
 
@@ -1164,12 +1189,20 @@ def run(
                 f"Experiment has been interrupted, but the most recent state was "
                 f"saved.\nResume experiment with: {restore_entrypoint}"
             )
+
+    if _use_storage_context():
+        # TODO(justinvyu): Leave refactoring the ExperimentAnalysis to use
+        # StorageContext for a follow-up PR.
+        # Just plug in the "remote_storage_path" for now.
+        remote_path = experiments[0].storage.storage_path
+
+    experiment_checkpoint = runner.experiment_state_path
+
     ea = ExperimentAnalysis(
         experiment_checkpoint,
         trials=all_trials,
         default_metric=metric,
         default_mode=mode,
-        sync_config=sync_config,
         remote_storage_path=remote_path,
     )
 
@@ -1226,7 +1259,7 @@ def run_experiments(
                 "[output] This uses the legacy output and progress reporter, "
                 "as Ray client is not supported by the new engine. "
                 "For more information, see "
-                "https://docs.ray.io/en/master/ray-air/experimental-features.html"
+                "https://github.com/ray-project/ray/issues/36949"
             )
         remote_run = ray.remote(num_cpus=0)(run_experiments)
 
