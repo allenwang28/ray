@@ -24,8 +24,8 @@ from ray.autoscaler._private.gcp.node import (
     GCPNodeType,
     GCPResource,
 )
-from ray.autoscaler._private.gcp.tpu_pod_command_runner import TPUPodCommandRunner
-from ray.autoscaler._private.command_runner import DockerCommandRunner, SSHCommandRunner
+from ray.autoscaler._private.gcp.tpu_command_runner import TPUCommandRunner
+from ray.autoscaler.command_runner import CommandRunnerInterface
 from ray.autoscaler.node_provider import NodeProvider
 
 logger = logging.getLogger(__name__)
@@ -254,7 +254,7 @@ class GCPNodeProvider(NodeProvider):
         use_internal_ip: bool,
         docker_config: Optional[Dict[str, Any]] = None,
     ) -> CommandRunnerInterface:
-        print("DEBUG: ", node_id)
+        """Returns a TPU command runner as applicable."""
         resource = self._get_resource_depending_on_node_name(node_id)
         instance = resource.get_instance(node_id)
         common_args = {
@@ -266,7 +266,10 @@ class GCPNodeProvider(NodeProvider):
             "process_runner": process_runner,
             "use_internal_ip": use_internal_ip,
         }
-        if resource == self.resources[GCPNodeType.TPU]:
-            return TPUPodCommandRunner(instance=instance, **common_args)
+        if (
+            GCPNodeType.TPU in self.resources
+            and resource == self.resources[GCPNodeType.TPU]
+        ):
+            return TPUCommandRunner(instance=instance, provider=self, **common_args)
         else:
             return super().get_command_runner(**common_args)
