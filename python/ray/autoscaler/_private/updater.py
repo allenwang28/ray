@@ -5,6 +5,7 @@ import time
 from threading import Thread
 
 import click
+import copy
 
 from ray._private.usage import usage_constants, usage_lib
 from ray.autoscaler._private import subprocess_output_util as cmd_output_util
@@ -88,6 +89,7 @@ class NodeUpdater:
         for_recovery=False,
     ):
 
+        print("NodeUpdater debug: init class")
         self.log_prefix = "NodeUpdater: {}: ".format(node_id)
         use_internal_ip = use_internal_ip or provider_config.get(
             "use_internal_ips", False
@@ -137,6 +139,7 @@ class NodeUpdater:
         self.for_recovery = for_recovery
 
     def run(self):
+        print("NodeUpdater debug: run()")
         update_start_time = time.time()
         if (
             cmd_output_util.does_allow_interactive()
@@ -196,6 +199,7 @@ class NodeUpdater:
         self.exitcode = 0
 
     def sync_file_mounts(self, sync_cmd, step_numbers=(0, 2)):
+        print("NodeUpdater debug: sync file mounts")
         # step_numbers is (# of previous steps, total steps)
         previous_steps, total_steps = step_numbers
 
@@ -323,6 +327,7 @@ class NodeUpdater:
                         time.sleep(READY_CHECK_INTERVAL)
 
     def do_update(self):
+        print("NodeUpdater debug: do update")
         self.provider.set_node_tags(
             self.node_id, {TAG_RAY_NODE_STATUS: STATUS_WAITING_FOR_SSH}
         )
@@ -510,6 +515,17 @@ class NodeUpdater:
                     # Local NodeProvider doesn't need resource and label override.
                     if self.provider_type != "local":
                         if self.node_resources:
+                            """
+                            resources = copy.deepcopy(self.node_resources)
+                            if "TPU" in resources.keys():
+                                print("DEBUG: Before ", resources)
+                                resource_str = "TPUPOD-" + self.node_id.split("/")[-1]
+                                resources[resource_str] = 1
+                                print("DEBUG: After ", resources)
+                            env_vars[
+                                RESOURCES_ENVIRONMENT_VARIABLE
+                            ] = resources
+                            """
                             env_vars[
                                 RESOURCES_ENVIRONMENT_VARIABLE
                             ] = self.node_resources

@@ -17,9 +17,7 @@ config = {
   "project_id": "mlperf-high-priority-project",
   "_has_tpus": True,
 }
-cluster_name = "tputest"
-
-GCPNodeProvider.bootstrap_config(cluster_config={})
+cluster_name = "tpupodtest"
 
 provider = GCPNodeProvider(
   provider_config=config,
@@ -28,24 +26,15 @@ provider = GCPNodeProvider(
 
 # Need a test case for duplicated compute instances
 resources = provider.non_terminated_nodes({})
+print(resources)
+node_id = resources[1]
+print(provider._get_node(node_id).get_labels())
 
-auth_config = {
-  "ssh_user": "ubuntu",
-  "ssh_private_key": "~/.ssh/id_rsa",
-}
-
-# Need a test for GCPTPUNode instance for get external/internal IPs
-command_runner = provider.get_command_runner(
-    log_prefix="test: ",
-    node_id=resources[0],
-    auth_config=auth_config,
-    cluster_name=cluster_name,
-    process_runner=subprocess,
-    use_internal_ip=True,
-    docker_config=None)
+node_type = provider.node_tags(node_id).get("ray-user-node-type")
+print(node_type)
 
 
-print(command_runner.run(
-  cmd="echo hi",
-  with_output=True,
-))
+resource = {'TPU': 1}
+if 'TPU' in resource.keys():
+  resource["test_abc"] = 1
+print(resource)

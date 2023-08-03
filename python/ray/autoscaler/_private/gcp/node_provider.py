@@ -78,6 +78,11 @@ class GCPNodeProvider(NodeProvider):
         # At this moment - Compute and TPUs
         self.resources: Dict[GCPNodeType, GCPResource] = {}
 
+        if "tpu_zone" in self.provider_config:
+            tpu_zone_key = "tpu_zone"
+        else:
+            tpu_zone_key = "availability_zone"
+
         # Compute is always required
         self.resources[GCPNodeType.COMPUTE] = GCPCompute(
             compute,
@@ -91,7 +96,7 @@ class GCPNodeProvider(NodeProvider):
             self.resources[GCPNodeType.TPU] = GCPTPU(
                 tpu,
                 self.provider_config["project_id"],
-                self.provider_config["availability_zone"],
+                self.provider_config[tpu_zone_key],
                 self.cluster_name,
             )
 
