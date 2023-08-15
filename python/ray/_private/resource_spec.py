@@ -1,6 +1,7 @@
 import importlib.util
 import logging
 import os
+import glob
 import re
 import subprocess
 import sys
@@ -30,6 +31,7 @@ class ResourceSpec(
         [
             "num_cpus",
             "num_gpus",
+            "num_tpus",
             "memory",
             "object_store_memory",
             "resources",
@@ -46,6 +48,7 @@ class ResourceSpec(
     Attributes:
         num_cpus: The CPUs allocated for this raylet.
         num_gpus: The GPUs allocated for this raylet.
+        num_tpus: The TPU chips allocated for this raylet.
         memory: The memory allocated for this raylet.
         object_store_memory: The object store memory allocated for this raylet.
             Note that when calling to_resource_dict(), this will be scaled down
@@ -62,6 +65,7 @@ class ResourceSpec(
         cls,
         num_cpus=None,
         num_gpus=None,
+        num_tpus=None,
         memory=None,
         object_store_memory=None,
         resources=None,
@@ -71,6 +75,7 @@ class ResourceSpec(
             cls,
             num_cpus,
             num_gpus,
+            num_tpus,
             memory,
             object_store_memory,
             resources,
@@ -87,7 +92,7 @@ class ResourceSpec(
     def to_resource_dict(self):
         """Returns a dict suitable to pass to raylet initialization.
 
-        This renames num_cpus / num_gpus to "CPU" / "GPU", translates memory
+        This renames num_cpus / num_gpus / num_tpus to "CPU" / "GPU" / "TPU", translates memory
         from bytes into 100MB memory units, and checks types.
         """
         assert self.resolved()
@@ -96,6 +101,7 @@ class ResourceSpec(
             self.resources,
             CPU=self.num_cpus,
             GPU=self.num_gpus,
+            TPU=self.num_tpus,
             memory=int(self.memory),
             object_store_memory=int(self.object_store_memory),
         )
@@ -146,8 +152,10 @@ class ResourceSpec(
         """
 
         resources = (self.resources or {}).copy()
+        print(resources)
         assert "CPU" not in resources, resources
         assert "GPU" not in resources, resources
+        assert "TPU" not in resources, resources
         assert "memory" not in resources, resources
         assert "object_store_memory" not in resources, resources
 
@@ -198,10 +206,23 @@ class ResourceSpec(
         except Exception:
             logger.exception("Could not parse gpu information.")
 
+        num_tpus = self.num_tpus
+        detected_tpus = _autodetect_num_tpus()
+        # Check that the number of TPUs requested by the raylet exactly matches
+        # the number of TPUs owned by the machine.
+        if num_tpus:
+            if num_tpus != detected_tpus:
+                raise ValueError("Attempting to start raylet with {} TPUs, "
+                                "but machine contains {}.".format(num_tpus, detected_tpus))
+        else:
+            num_tpus = detected_tpus
+
         # Choose a default object store size.
         system_memory = ray._private.utils.get_system_memory()
         avail_memory = ray._private.utils.estimate_available_memory()
+
         object_store_memory = self.object_store_memory
+        print("object store memory: ", object_store_memory)
         if object_store_memory is None:
             object_store_memory = int(
                 avail_memory * ray_constants.DEFAULT_OBJECT_STORE_MEMORY_PROPORTION
@@ -270,7 +291,7 @@ class ResourceSpec(
                 )
 
         spec = ResourceSpec(
-            num_cpus, num_gpus, memory, object_store_memory, resources, redis_max_memory
+            num_cpus, num_gpus, num_tpus, memory, object_store_memory, resources, redis_max_memory
         )
         assert spec.resolved()
         return spec
@@ -372,3 +393,25 @@ def _pretty_gpu_name(name):
         return None
     match = GPU_NAME_PATTERN.match(name)
     return match.group(1) if match else None
+
+
+def _autodetect_num_tpus():
+    """Attempt to detect the number of TPUs on this machine.
+
+    TPU chips are represented as devices within `/dev/`, either as
+    `/dev/accel*` or `/dev/vfio/*`.
+
+    Returns:
+        The number of TPUs if any were detected, otherwise 0.
+    """
+    accel_files = glob.glob("/dev/accel*")
+    if accel_files:
+        return len(accel_files)
+    
+    try:
+        vfio_entries = os.listdir("/dev/vfio")
+        numeric_entries = [int(entry) for entry in vfio_entries if entry.isdigit()]
+        return max(numeric_entries, default=0)
+    except Exception as e:
+        print(f"Error: {e}")
+        return 0

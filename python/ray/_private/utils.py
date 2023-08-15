@@ -373,9 +373,9 @@ def resources_from_ray_options(options_dict: Dict[str, Any]) -> Dict[str, Any]:
     """
     resources = (options_dict.get("resources") or {}).copy()
 
-    if "CPU" in resources or "GPU" in resources:
+    if "CPU" in resources or "GPU" in resources or "TPU" in resources:
         raise ValueError(
-            "The resources dictionary must not contain the key 'CPU' or 'GPU'"
+            "The resources dictionary must not contain the key 'CPU', 'GPU' or 'TPU'"
         )
     elif "memory" in resources or "object_store_memory" in resources:
         raise ValueError(
@@ -385,6 +385,7 @@ def resources_from_ray_options(options_dict: Dict[str, Any]) -> Dict[str, Any]:
 
     num_cpus = options_dict.get("num_cpus")
     num_gpus = options_dict.get("num_gpus")
+    num_tpus = options_dict.get("num_tpus")
     memory = options_dict.get("memory")
     object_store_memory = options_dict.get("object_store_memory")
     accelerator_type = options_dict.get("accelerator_type")
@@ -393,6 +394,8 @@ def resources_from_ray_options(options_dict: Dict[str, Any]) -> Dict[str, Any]:
         resources["CPU"] = num_cpus
     if num_gpus is not None:
         resources["GPU"] = num_gpus
+    if num_tpus is not None:
+        resources["TPU"] = num_tpus
     if memory is not None:
         resources["memory"] = int(memory)
     if object_store_memory is not None:

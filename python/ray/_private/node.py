@@ -460,6 +460,7 @@ class Node:
             """
             num_cpus = env_dict.pop("CPU", None)
             num_gpus = env_dict.pop("GPU", None)
+            num_tpus = env_dict.pop("TPU", None)
             memory = env_dict.pop("memory", None)
             object_store_memory = env_dict.pop("object_store_memory", None)
 
@@ -472,7 +473,7 @@ class Node:
                         "Autoscaler is overriding your resource:"
                         f"{key}: {params_dict[key]} with {env_dict[key]}."
                     )
-            return num_cpus, num_gpus, memory, object_store_memory, result
+            return num_cpus, num_gpus, num_tpus, memory, object_store_memory, result
 
         if not self._resource_spec:
             env_resources = {}
@@ -487,6 +488,7 @@ class Node:
             (
                 num_cpus,
                 num_gpus,
+                num_tpus,
                 memory,
                 object_store_memory,
                 resources,
@@ -494,6 +496,7 @@ class Node:
             self._resource_spec = ResourceSpec(
                 self._ray_params.num_cpus if num_cpus is None else num_cpus,
                 self._ray_params.num_gpus if num_gpus is None else num_gpus,
+                self._ray_params.num_tpus if num_tpus is None else num_tpus,
                 self._ray_params.memory if memory is None else memory,
                 self._ray_params.object_store_memory
                 if object_store_memory is None

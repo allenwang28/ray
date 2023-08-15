@@ -93,9 +93,9 @@ def _validate_resources(resources: Optional[Dict[str, float]]) -> Optional[str]:
     if resources is None:
         return None
 
-    if "CPU" in resources or "GPU" in resources:
+    if "CPU" in resources or "GPU" in resources or "TPU" in resources:
         return (
-            "Use the 'num_cpus' and 'num_gpus' keyword instead of 'CPU' and 'GPU' "
+            "Use the 'num_cpus', 'num_gpus', and 'num_tpus' keyword instead of 'CPU', 'GPU' and 'TPU' "
             "in 'resources' keyword"
         )
 
@@ -113,6 +113,7 @@ _common_options = {
     "name": Option((str, type(None))),
     "num_cpus": _resource_option("num_cpus"),
     "num_gpus": _resource_option("num_gpus"),
+    "num_tpus": _resource_option("num_tpus"),
     "object_store_memory": _counting_option("object_store_memory", False),
     # TODO(suquark): "placement_group", "placement_group_bundle_index"
     # and "placement_group_capture_child_tasks" are deprecated,

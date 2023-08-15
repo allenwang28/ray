@@ -58,7 +58,7 @@ def get_node_type(node: dict) -> GCPNodeType:
     This works for both node configs and API returned nodes.
     """
 
-    if "machineType" not in node and "acceleratorType" not in node:
+    if "machineType" not in node and "acceleratorType" not in node and "acceleratorConfig" not in node:
         raise ValueError(
             "Invalid node. For a Compute instance, 'machineType' is "
             "required. "
@@ -67,7 +67,11 @@ def get_node_type(node: dict) -> GCPNodeType:
             f"Got {list(node)}"
         )
 
-    if "machineType" not in node and "acceleratorType" in node:
+    if "machineType" not in node and ("acceleratorType" in node or "acceleratorConfig" in node):
+        if "acceleratorType" in node and "acceleratorConfig" in node:
+            raise ValueError(
+                "For TPU usage, acceleratorType and acceleratorConfig cannot both be set."
+            )
         return GCPNodeType.TPU
     return GCPNodeType.COMPUTE
 
@@ -164,7 +168,10 @@ def _has_tpus_in_node_configs(config: dict) -> bool:
         node_type["node_config"]
         for node_type in config["available_node_types"].values()
     ]
-    return any(get_node_type(node) == GCPNodeType.TPU for node in node_configs)
+    logger.info("[DEBUG]: has_tpus_in_node_configs: %s", node_configs)
+    retval = any(get_node_type(node) == GCPNodeType.TPU for node in node_configs)
+    logger.info("[DEBUG] _has_tpus_in_node_configs returning %s", retval)
+    return retval
 
 
 def _is_head_node_a_tpu(config: dict) -> bool:
@@ -195,6 +202,7 @@ def _create_compute(gcp_credentials=None):
 
 
 def _create_tpu(gcp_credentials=None):
+    logger.info("[DEBUG] creating TPU resource")
     return discovery.build(
         "tpu",
         TPU_VERSION,
@@ -212,6 +220,7 @@ def construct_clients_from_provider_config(provider_config):
     tpu resource (the last element of the tuple) will be None if
     `_has_tpus` in provider config is not set or False.
     """
+    logger.info("[DEBUG] construct_clients_from_provider_config")
     gcp_credentials = provider_config.get("gcp_credentials")
     if gcp_credentials is None:
         logger.debug(
@@ -219,6 +228,7 @@ def construct_clients_from_provider_config(provider_config):
             "Falling back to GOOGLE_APPLICATION_CREDENTIALS "
             "environment variable."
         )
+        logger.info("[DEBUG] about to determine whether or not to create TPU resource.")
         tpu_resource = (
             _create_tpu()
             if provider_config.get(HAS_TPU_PROVIDER_FIELD, False)
@@ -255,6 +265,7 @@ def construct_clients_from_provider_config(provider_config):
         # Otherwise the credentials type must be credentials_token.
         credentials = OAuthCredentials(credentials_field)
 
+    logger.info("[DEBUG] Creating TPU Resource?")
     tpu_resource = (
         _create_tpu(credentials)
         if provider_config.get(HAS_TPU_PROVIDER_FIELD, False)
@@ -270,6 +281,7 @@ def construct_clients_from_provider_config(provider_config):
 
 
 def bootstrap_gcp(config):
+    logger.info("[DEBUG] bootstrapping GCP")
     config = copy.deepcopy(config)
     check_legacy_fields(config)
     # Used internally to store head IAM role.
@@ -278,7 +290,10 @@ def bootstrap_gcp(config):
     # Check if we have any TPUs defined, and if so,
     # insert that information into the provider config
     if _has_tpus_in_node_configs(config):
+        logger.info("[DEBUG] Setting HAS_TPU_PROVIDER_FIELD")
         config["provider"][HAS_TPU_PROVIDER_FIELD] = True
+    else:
+        logger.info("[DEBUG] Setting does not set HAS_TPU_PROVIDER_FIELD")
 
     crm, iam, compute, tpu = construct_clients_from_provider_config(config["provider"])
 

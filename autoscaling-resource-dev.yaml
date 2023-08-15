@@ -25,9 +25,12 @@ available_node_types:
     ray_tpu:
         min_workers: 1
         max_workers: 2
-        resources: {"TPU": 1}  # use TPU custom resource in your code
+        resources: {"TPU": 4}
         node_config:
-            acceleratorType: v4-8
+            #acceleratorType: v4-8
+            acceleratorConfig:
+              type: V4
+              topology: 2x2x1
             runtimeVersion: tpu-vm-v4-base
         worker_setup_commands:
             - pip install 'jax[tpu]==0.4.11' -f https://storage.googleapis.com/jax-releases/libtpu_releases.html
@@ -51,7 +54,7 @@ available_node_types:
                   sourceImage: projects/deeplearning-platform-release/global/images/family/pytorch-latest-gpu
             # Make sure to set scheduling->onHostMaintenance to TERMINATE when GPUs are present
             guestAccelerators:
-              - acceleratorType: nvidia-tesla-a100
+              - acceleratorType: nvidia-tesla-v100
                 acceleratorCount: 1
             metadata:
               items:
@@ -66,8 +69,8 @@ available_node_types:
 
 provider:
     type: gcp
-    region: us-central1
-    availability_zone: us-central1-a
+    region: us-central2
+    availability_zone: us-central2-b
     tpu_zone: us-central2-b
     project_id: mlperf-high-priority-project
 
@@ -78,6 +81,8 @@ initialization_commands:
   - pip install --upgrade urllib3
   - pip install "ray[default]"
   - pip install /home/ubuntu/ray-3.0.0.dev0-cp38-cp38-manylinux2014_x86_64.whl
+  - rm -rf ~/.local/lib/python3.8/site-packages/ray/_private
+  - cp -R ~/_private ~/.local/lib/python3.8/site-packages/ray/
 
 head_setup_commands:
   - pip install google-api-python-client
@@ -86,6 +91,7 @@ head_setup_commands:
 
 file_mounts: {
     "/home/ubuntu/autoscaler": "/home/allencwang/ray/python/ray/autoscaler",
+    "/home/ubuntu/_private": "/home/allencwang/ray/python/ray/_private",
     "/home/ubuntu/ray-3.0.0.dev0-cp38-cp38-manylinux2014_x86_64.whl": "/home/allencwang/ray-3.0.0.dev0-cp38-cp38-manylinux2014_x86_64.whl",
     "/home/ubuntu/apps": "/home/allencwang/ray/apps-dev",
 }

@@ -308,6 +308,8 @@ class _ActorClassMetadata:
             task.
         num_gpus: The default number of GPUs required by the actor creation
             task.
+        num_tpus: The default number of TPUs required by the actor creation
+            task.
         memory: The heap memory quota for this actor.
         resources: The default resources required by the actor creation task.
         accelerator_type: The specified type of accelerator required for the
@@ -333,6 +335,7 @@ class _ActorClassMetadata:
         max_task_retries,
         num_cpus,
         num_gpus,
+        num_tpus,
         memory,
         object_store_memory,
         resources,
@@ -351,6 +354,7 @@ class _ActorClassMetadata:
         self.max_task_retries = max_task_retries
         self.num_cpus = num_cpus
         self.num_gpus = num_gpus
+        self.num_tpus = num_tpus
         self.memory = memory
         self.object_store_memory = object_store_memory
         self.resources = resources
@@ -545,6 +549,8 @@ class ActorClass:
                 for this task or for the lifetime of the actor.
             num_gpus: The quantity of GPUs to reserve
                 for this task or for the lifetime of the actor.
+            num_tpus: The quantity of TPUs to reserve
+                for this task or for the lifetime of the actor.
             resources (Dict[str, float]): The quantity of various custom resources
                 to reserve for this task or for the lifetime of the actor.
                 This is a dictionary mapping strings (resource names) to floats.
@@ -674,6 +680,7 @@ class ActorClass:
             kwargs: The keyword arguments to forward to the actor constructor.
             num_cpus: The number of CPUs required by the actor creation task.
             num_gpus: The number of GPUs required by the actor creation task.
+            num_gpus: The number of TPUs required by the actor creation task.
             memory: Restrict the heap memory usage of this actor.
             resources: The custom resources required by the actor creation
                 task.

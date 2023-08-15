@@ -181,6 +181,7 @@ class Cluster:
         default_kwargs = {
             "num_cpus": 1,
             "num_gpus": 0,
+            "num_tpus": 0,
             "object_store_memory": 150 * 1024 * 1024,  # 150 MiB
             "min_worker_port": 0,
             "max_worker_port": 0,
