@@ -1,13 +1,19 @@
 import ray
 import time
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 
 @ray.remote(num_cpus=1)
 class TPUDict:
   def __init__(self):
     self._tpu_group_availability_map = {}
+
+  def get_existing_count(self) -> int:
+    return len(self._tpu_group_availability_map)
+
+  def get_keys(self) -> List[str]:
+    return self._tpu_group_availability_map.keys()
 
   def has_entry(self, tpu_id: str) -> bool:
     print(
@@ -105,11 +111,7 @@ def periodically_update_resources(resource_map: TPUDict, update_rate_in_s: int):
       if not has_entry:
         resource_map.add_entry.remote(tpu_id=tpu_id, hosts=int(tpu_resources[tpu_id]))
 
-    # Prune old resources
-    for tpu_id in resource_map.keys():
-      if tpu_id not in tpu_resources:
-        resource_map.remove_entry.remote(tpu_id=tpu_id)
-
+    print("sleep")
     time.sleep(update_rate_in_s)
 
 
@@ -136,14 +138,15 @@ class GlobalTPUManager:
     print("DEBUG: Instantiating GlobalTPUManager")
     self._tpu_dict = TPUDict.remote()
     self._tpu_group_availability_map = {}
-    self._resource_update_rate_in_s = 10
     self._periodic_update_handle = periodically_update_resources.remote(
-      self._tpu_dict, self._resource_update_rate_in_s)
+      self._tpu_dict, 5)
 
   def _make_resource_request(self):
     """Requests more resources from Ray."""
     print("Requesting more resources.")
-    ray.autoscaler.sdk.request_resources(bundles=[{'TPU': 4}])
+    num_existing_hosts = ray.get(self._tpu_dict.get_existing_count.remote())
+    resource_request = [{'TPU': 4}] * (num_existing_hosts + 1)
+    ray.autoscaler.sdk.request_resources(bundles=resource_request)
 
   def schedule_actors_on_tpu_pod(
     self, num_hosts: int, actor_def: Any) -> ray.util.ActorPool:

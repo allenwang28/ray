@@ -16,7 +16,7 @@ class SampleActorShard:
     print(f"[{self._host}] Initializing {worker_id}")
 
   def say_something(self, something: str):
-    return f"{self._worker_id} says {something}."
+    return f"[{self._host}] worker {self._worker_id} says {something}."
 
 
 @ray.remote(num_cpus=1)
@@ -45,12 +45,17 @@ def schedule_actors_on_tpu_pod(
 
 
 num_hosts = 2
+num_tpu_pods = 2
+
 print("Creating actor handlers")
-handler1 = ActorHandler.remote(num_hosts=num_hosts, scheduling_fn=schedule_actors_on_tpu_pod)
-handler2 = ActorHandler.remote(num_hosts=num_hosts, scheduling_fn=schedule_actors_on_tpu_pod)
+handles = [
+  ActorHandler.remote(num_hosts=num_hosts, scheduling_fn=schedule_actors_on_tpu_pod)
+  for _ in range(num_tpu_pods)
+]
 
 time.sleep(5)
 
-print(ray.get(handler1.say_something.remote("helllllo there!")))
-print(ray.get(handler2.say_something.remote("what?")))
+for handle in handles:
+  print(ray.get(handle.say_something.remote("helllllo there!")))
+  print(ray.get(handle.say_something.remote("abc?!?!")))
 
