@@ -18,6 +18,14 @@ class SampleActorShard:
   def say_something(self, something: str):
     return f"[{self._host}] worker {self._worker_id} says {something}."
 
+  def get_local_device_count(self) -> int:
+    import jax
+    return jax.local_device_count()
+
+  def get_global_device_count(self) -> int:
+    import jax
+    return jax.device_count()
+
 
 @ray.remote(num_cpus=1)
 class ActorHandler:
@@ -32,6 +40,14 @@ class ActorHandler:
     somethings = [something] * self.num_hosts
     return list(self._shard_pool.map(lambda a, v: a.say_something.remote(v), somethings))
 
+  def get_local_device_count(self):
+    args = [None] * self.num_hosts
+    return list(self._shard_pool.map(lambda a, v: a.get_local_device_count.remote(), args))
+
+  def get_global_device_count(self):
+    args = [None] * self.num_hosts
+    return list(self._shard_pool.map(lambda a, v: a.get_global_device_count.remote(), args))
+
 
 global_tpu_manager = GlobalTPUManager.remote()
 
@@ -45,7 +61,7 @@ def schedule_actors_on_tpu_pod(
 
 
 num_hosts = 2
-num_tpu_pods = 2
+num_tpu_pods = 1
 
 print("Creating actor handlers")
 handles = [
@@ -54,8 +70,9 @@ handles = [
 ]
 
 time.sleep(5)
+print("Actor handles created")
 
 for handle in handles:
   print(ray.get(handle.say_something.remote("helllllo there!")))
-  print(ray.get(handle.say_something.remote("abc?!?!")))
-
+  print(ray.get(handle.get_global_device_count.remote()))
+  print(ray.get(handle.get_local_device_count.remote()))

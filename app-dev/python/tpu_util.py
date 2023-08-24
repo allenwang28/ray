@@ -8,6 +8,13 @@ from typing import Any, Dict, List, Optional
 class TPUDict:
   def __init__(self):
     self._tpu_group_availability_map = {}
+    self._initialized = False
+
+  def mark_initialized(self):
+    self._initialized = True
+
+  def is_initialized(self):
+    return self._initialized
 
   def get_existing_count(self) -> int:
     return len(self._tpu_group_availability_map)
@@ -16,10 +23,7 @@ class TPUDict:
     return self._tpu_group_availability_map.keys()
 
   def has_entry(self, tpu_id: str) -> bool:
-    print(
-      f"DEBUG: checking if we have entry {tpu_id}. "
-      f"tpu_group_availability_map: {self._tpu_group_availability_map}")
-    return tpu_id in self._tpu_group_availability_map
+   return tpu_id in self._tpu_group_availability_map
 
   def add_entry(self, tpu_id: str, hosts: int):
     print(
@@ -97,21 +101,17 @@ def periodically_update_resources(resource_map: TPUDict, update_rate_in_s: int):
   print("Starting to periodically update.")
   while True:
     cluster_resources = ray.available_resources()
-    print(f"cluster resources: {cluster_resources}")
     tpu_resources = dict(filter(
       lambda item: item[0].endswith("-tpu"),
       cluster_resources.items()))
-    print(f"TPU resources: {tpu_resources}")
 
     # Add any new resources
     for tpu_id in tpu_resources.keys():
-      print(f"tpu_id: {tpu_id}")
       has_entry = ray.get(resource_map.has_entry.remote(tpu_id))
-      print(f"has_entry: {has_entry}")
       if not has_entry:
         resource_map.add_entry.remote(tpu_id=tpu_id, hosts=int(tpu_resources[tpu_id]))
 
-    print("sleep")
+    resource_map.mark_initialized.remote()
     time.sleep(update_rate_in_s)
 
 
@@ -158,7 +158,7 @@ class GlobalTPUManager:
       print(f"Candidate id: {candidate_id}")
       if not candidate_id:
         # make resource request and restart
-        if not requested_resources:
+        if not requested_resources and ray.get(self._tpu_dict.is_initialized.remote()):
           self._make_resource_request()
           requested_resources = True
         time.sleep(5)
