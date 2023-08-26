@@ -26,25 +26,33 @@ class TPUDict:
    return tpu_id in self._tpu_group_availability_map
 
   def add_entry(self, tpu_id: str, hosts: int):
+    """
     print(
       f"DEBUG: Adding entry. "
       f"tpu_group_availability_map: {self._tpu_group_availability_map}")
+    """
     self._tpu_group_availability_map[tpu_id] = dict(
       hosts=hosts,
       available=True
     )
+    """
     print(
       f"DEBUG: Done adding entry. "
       f"tpu_group_availability_map: {self._tpu_group_availability_map}")
+    """
 
   def remove_entry(self, tpu_id: str):
+    """
     print(
       f"DEBUG: Removing entry. "
       f"tpu_group_availability_map: {self._tpu_group_availability_map}")
+    """
     self._tpu_group_availability_map[tpu_id].pop(tpu_id)
+    """
     print(
       f"DEBUG: Done removing entry. "
       f"tpu_group_availability_map: {self._tpu_group_availability_map}")
+    """
 
   def claim_resource(self, group_id: str) -> bool:
     """Claims a group id.
@@ -56,14 +64,16 @@ class TPUDict:
       claimed.
 
     """
+    """
     print(f"DEBUG: claiming resource: {group_id}")
     print(f"availability map: {self._tpu_group_availability_map}")
+    """
     if group_id not in self._tpu_group_availability_map:
       logging.warning(f"{group_id} is not a valid group_id.")
       return False
-    print(f"DEBUG: {group_id} should be valid")
+    #print(f"DEBUG: {group_id} should be valid")
     entry = self._tpu_group_availability_map[group_id]
-    print(f"DEBUG: entry: {entry}")
+    #print(f"DEBUG: entry: {entry}")
     if not entry["available"]:
       logging.warning(f"{group_id} is not available.")
       return False
@@ -83,7 +93,7 @@ class TPUDict:
       List[str], representing the group ids that are perfect matches
 
     """
-    print(f"Trying to get valid group id from {self._tpu_group_availability_map}")
+    #print(f"Trying to get valid group id from {self._tpu_group_availability_map}")
     valid_entries = list(filter(
       lambda item: item[1]["hosts"] and item[1]["available"],
       self._tpu_group_availability_map.items()))
@@ -135,7 +145,7 @@ class GlobalTPUManager:
 
   """
   def __init__(self):
-    print("DEBUG: Instantiating GlobalTPUManager")
+    #print("DEBUG: Instantiating GlobalTPUManager")
     self._tpu_dict = TPUDict.remote()
     self._tpu_group_availability_map = {}
     self._periodic_update_handle = periodically_update_resources.remote(
@@ -149,13 +159,13 @@ class GlobalTPUManager:
     ray.autoscaler.sdk.request_resources(bundles=resource_request)
 
   def schedule_actors_on_tpu_pod(
-    self, num_hosts: int, actor_def: Any) -> ray.util.ActorPool:
+    self, num_hosts: int, actor_def: Any) -> List[Any]:
     """Schedules actors on a TPU pod."""
     requested_resources = False
     while True:
       candidate_id = ray.get(
         self._tpu_dict.get_valid_group_id.remote(num_hosts))
-      print(f"Candidate id: {candidate_id}")
+      #print(f"Candidate id: {candidate_id}")
       if not candidate_id:
         # make resource request and restart
         if not requested_resources and ray.get(self._tpu_dict.is_initialized.remote()):
@@ -163,5 +173,4 @@ class GlobalTPUManager:
           requested_resources = True
         time.sleep(5)
       else:
-        actors = [actor_def.options(resources={candidate_id: 1}).remote(i) for i in range(num_hosts)] 
-        return ray.util.ActorPool(actors)
+        return [actor_def.options(resources={candidate_id: 1}).remote(i) for i in range(num_hosts)] 
