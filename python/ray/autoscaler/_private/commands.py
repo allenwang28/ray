@@ -776,6 +776,7 @@ def get_or_create_head_node(
             cli_logger.newline()
 
     global_event_system.execute_callback(CreateClusterEvent.head_node_acquired)
+    print("[DEBUG] head node is: ", head_node)
 
     with cli_logger.group(
         "Setting up head node",
@@ -820,6 +821,7 @@ def get_or_create_head_node(
         if not no_restart:
             warn_about_bad_start_command(ray_start_commands, no_monitor_on_head)
 
+        print("DEBUG: head node creation named: ", head_node)
         updater = NodeUpdaterThread(
             node_id=head_node,
             provider_config=config["provider"],
