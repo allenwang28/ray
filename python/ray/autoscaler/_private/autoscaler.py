@@ -449,6 +449,7 @@ class StandardAutoscaler:
             ensure_min_cluster_size=self.load_metrics.get_resource_requests(),
             node_availability_summary=self.node_provider_availability_tracker.summary(),
         )
+        print("[DEBUG] to_launch ", to_launch)
         self._report_pending_infeasible(unfulfilled)
 
         if not self.provider.is_readonly():

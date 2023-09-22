@@ -43,7 +43,7 @@ available_node_types:
         # For more documentation on available fields, see:
         # https://cloud.google.com/compute/docs/reference/rest/v1/instances/insert
         node_config:
-            machineType: a2-highgpu-1g
+            machineType: n1-standard-16
             disks:
               - boot: true
                 autoDelete: true
@@ -69,8 +69,8 @@ available_node_types:
 
 provider:
     type: gcp
-    region: us-central2
-    availability_zone: us-central2-b
+    region: us-central1
+    availability_zone: us-central1-b
     tpu_zone: us-central2-b
     project_id: mlperf-high-priority-project
 
